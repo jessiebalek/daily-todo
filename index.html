@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Daily To-Do</title>
+<title>Daily Briefing</title>
 <style>
   :root {
     --navy: #0B3D6B;
@@ -12,6 +12,7 @@
     --ink: #1B2334;
     --muted: #5E6B80;
     --border: #D4D8E4;
+    --accent: #E30B5D;
   }
 
   * { box-sizing: border-box; }
@@ -25,13 +26,13 @@
   }
 
   .page {
-    max-width: 640px;
+    max-width: 720px;
     margin: 0 auto;
     padding: 48px 24px 80px;
   }
 
   header {
-    margin-bottom: 28px;
+    margin-bottom: 32px;
   }
 
   .date {
@@ -64,24 +65,43 @@
 
   .progress-fill {
     height: 100%;
-    background: var(--navy);
+    background: var(--accent);
     width: 0%;
     transition: width 0.4s ease;
   }
 
-  .section {
-    margin-bottom: 28px;
+  /* ---- Client checklist sections ---- */
+  .client-section {
+    margin-bottom: 22px;
+    border-left: 3px solid var(--border);
+    padding-left: 16px;
   }
 
-  .section-label {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--muted);
+  .client-section.heaviest {
+    border-left-color: var(--accent);
+  }
+
+  .client-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
     border-bottom: 1px solid var(--border);
     padding-bottom: 8px;
     margin-bottom: 4px;
+  }
+
+  .client-name {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .client-count {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
   }
 
   ul.tasks {
@@ -94,7 +114,7 @@
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding: 13px 0;
+    padding: 12px 0;
     border-bottom: 1px solid var(--border);
   }
 
@@ -137,9 +157,13 @@
     transform: rotate(45deg);
   }
 
-  .task-text {
+  .task-body {
     flex: 1;
-    font-size: 16px;
+    min-width: 0;
+  }
+
+  .task-text {
+    font-size: 15.5px;
     line-height: 1.4;
     cursor: pointer;
     user-select: none;
@@ -152,24 +176,44 @@
   }
 
   .task-meta {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
   }
 
-  .empty {
+  .task-source {
+    display: inline-block;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--navy);
+    font-weight: 600;
+    background: #E3EAF4;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  .task-due {
+    font-size: 11.5px;
     color: var(--muted);
-    font-size: 14px;
-    padding: 16px 0;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .task-due.overdue {
+    color: var(--accent);
+    font-weight: 600;
   }
 
   .add-row {
     display: flex;
     gap: 8px;
-    margin-top: 14px;
+    margin-top: 12px;
   }
 
-  .add-row input {
+  .add-row input[type="text"] {
     flex: 1;
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -178,6 +222,22 @@
     font-family: inherit;
     background: var(--surface);
     color: var(--ink);
+  }
+
+  .add-row input[type="date"] {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--muted);
+    width: 132px;
+  }
+
+  .add-row input:focus {
+    outline: none;
+    border-color: var(--navy);
   }
 
   .add-row input:focus {
@@ -195,16 +255,105 @@
     cursor: pointer;
   }
 
-  .sync-note {
-    margin-top: 36px;
-    font-size: 12px;
-    color: var(--muted);
+  /* ---- Briefing zone (read-only) ---- */
+  .briefing {
+    margin-top: 44px;
+    padding-top: 28px;
     border-top: 1px solid var(--border);
-    padding-top: 14px;
+  }
+
+  .briefing-title {
+    font-family: Georgia, serif;
+    font-size: 14px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--navy);
+    font-weight: 700;
+    margin-bottom: 18px;
+  }
+
+  .brief-block {
+    margin-bottom: 26px;
+  }
+
+  .brief-block h3 {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+
+  .brief-item {
+    display: flex;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14.5px;
+  }
+
+  .brief-item:last-child { border-bottom: none; }
+
+  .brief-time {
+    flex-shrink: 0;
+    width: 64px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+  }
+
+  .brief-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .brief-sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 2px;
+  }
+
+  .pill {
+    display: inline-block;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .pill.assigned-me { background: #E9EDF4; color: var(--navy); }
+  .pill.assigned-others { background: #E9EDF4; color: var(--navy); }
+  .pill.outage-open { background: #FCE8EE; color: var(--accent); }
+  .pill.outage-watch { background: #EEF1F6; color: var(--muted); }
+  .pill.stage { background: #E3EAF4; color: var(--navy); }
+
+  .subgroup-label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--navy);
+    font-weight: 700;
+    margin: 14px 0 6px;
+  }
+
+  .empty {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 8px 0;
   }
 
   @media (prefers-reduced-motion: reduce) {
     .progress-fill { transition: none; }
+  }
+
+  @media (max-width: 480px) {
+    .brief-time { width: 50px; }
+    .add-row { flex-wrap: wrap; }
+    .add-row input[type="text"] { flex-basis: 100%; }
+    .add-row input[type="date"] { flex: 1; width: auto; }
   }
 </style>
 </head>
@@ -219,22 +368,92 @@
     <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
   </header>
 
-  <div id="sections"></div>
+  <div id="clientSections"></div>
 
-  <div class="sync-note" id="syncNote">Checked items are saved locally on this device.</div>
+  <div class="briefing">
+    <div class="briefing-title">Today's Briefing</div>
+
+    <div class="brief-block">
+      <h3>Calendar — jessie.balek@fullyvested.com</h3>
+      <div id="calendarList"></div>
+    </div>
+
+    <div class="brief-block">
+      <h3>Asana Updates</h3>
+      <div class="subgroup-label">Assigned to me</div>
+      <div id="asanaMeList"></div>
+      <div class="subgroup-label">Assigned to others</div>
+      <div id="asanaOthersList"></div>
+    </div>
+
+    <div class="brief-block">
+      <h3>Team Outages</h3>
+      <div id="outageList"></div>
+    </div>
+  </div>
 </div>
 
 <script>
-  // ---- Data model ----
-  // Each task: { id, text, done, source }
-  // Replace this seed list with whatever your nightly routine generates.
-  const STORAGE_KEY = "dailyTodoState";
+  const STORAGE_KEY = "dailyTodoState_v2";
 
+  // ---- Seed data — replace with real pulls from the nightly Claude Code routine ----
   const seedTasks = [
-    { id: "t1", text: "Review overnight Asana comments", done: false, source: "Asana" },
-    { id: "t2", text: "Reply to outstanding Slack threads", done: false, source: "Slack" },
-    { id: "t3", text: "Draft daily briefing follow-up", done: false, source: "Today" }
+    { id: "a1", text: "Finalize Q3 messaging deck redline", source: "Asana", client: "AFA", done: false, dueDate: "2026-06-30" },
+    { id: "a2", text: "Send revised press pitch for review", source: "Email", client: "AFA", done: false, dueDate: "2026-07-02" },
+    { id: "m1", text: "Confirm spokesperson availability", source: "Slack", client: "MPPL", done: false, dueDate: "2026-06-29" },
+    { id: "r1", text: "Review competitive analysis draft", source: "Granola", client: "RWA", done: false, dueDate: null },
+    { id: "s1", text: "Approve social content calendar", source: "Asana", client: "SCS", done: false, dueDate: "2026-07-01" },
+    { id: "aa1", text: "Follow up on outstanding byline edits", source: "Email", client: "AAAIM", done: false, dueDate: null },
+    { id: "ad1", text: "Submit weekly time tracking", source: "Asana", client: "Admin", done: false, dueDate: "2026-06-30" },
+    { id: "ad2", text: "Clear inbox backlog", source: "Email", client: "Admin", done: false, dueDate: null }
   ];
+
+  const seedCalendar = [
+    { time: "9:00 AM", title: "AFA weekly sync", sub: "Zoom · 30 min" },
+    { time: "11:30 AM", title: "MPPL spokesperson prep call", sub: "Zoom · 45 min" },
+    { time: "2:00 PM", title: "Internal team standup", sub: "Slack huddle · 15 min" }
+  ];
+
+  const seedAsanaMe = [
+    { text: "Draft RWA positioning summary", client: "RWA", dueDate: "2026-06-30", stage: "In Progress", lastComment: "Pulled in competitor quotes, finishing exec summary tonight.", completed: false },
+    { text: "Review SCS social copy batch", client: "SCS", dueDate: "2026-07-01", stage: "In Review", lastComment: "Sent back two posts for tone adjustments.", completed: false },
+    { text: "Update AFA press list", client: "AFA", dueDate: "2026-06-27", stage: "Done", lastComment: "Finalized and shared with the team.", completed: true }
+  ];
+
+  const seedAsanaOthers = [
+    { text: "AAAIM byline — awaiting client edits", client: "AAAIM", dueDate: "2026-07-03", stage: "Blocked", lastComment: "Alex: still waiting on client sign-off, following up today.", completed: false, assignee: "Alex" },
+    { text: "AFA deck — design pass", client: "AFA", dueDate: "2026-07-02", stage: "In Progress", lastComment: "Priya: first pass done, second round of edits tomorrow.", completed: false, assignee: "Priya" },
+    { text: "MPPL outreach tracker cleanup", client: "MPPL", dueDate: "2026-06-26", stage: "Done", lastComment: "Jordan: archived stale rows, tracker is current.", completed: true, assignee: "Jordan" }
+  ];
+
+  const seedOutages = [
+    { text: "Slack — intermittent notification delays", status: "open" },
+    { text: "Granola — transcript sync running ~10 min behind", status: "watch" }
+  ];
+
+  function todayLabel() {
+    return new Date().toDateString();
+  }
+
+  function formatDueDate(isoDate) {
+    const d = new Date(isoDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((d - today) / 86400000);
+
+    if (diffDays === 0) return "Due today";
+    if (diffDays === 1) return "Due tomorrow";
+    if (diffDays === -1) return "Due yesterday";
+    return `Due ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  }
+
+  function isOverdue(isoDate, done) {
+    if (done) return false;
+    const d = new Date(isoDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d < today;
+  }
 
   function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -242,9 +461,6 @@
     try {
       const parsed = JSON.parse(raw);
       if (parsed.date !== todayLabel()) {
-        // A new day started client-side; in the real version, the nightly
-        // job replaces this file/data before the page loads, so this is
-        // just a same-day fallback.
         return { date: todayLabel(), tasks: seedTasks };
       }
       return parsed;
@@ -257,40 +473,84 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  function todayLabel() {
-    return new Date().toDateString();
-  }
-
   let state = loadState();
 
-  // ---- Rendering ----
+  const CLIENT_ORDER = ["AFA", "MPPL", "RWA", "SCS", "AAAIM", "Admin"];
+
   function render() {
     document.getElementById("dateHeader").textContent =
       new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
-    const sections = {};
+    renderClientSections();
+    renderCalendar();
+    renderAsana();
+    renderOutages();
+    updateProgress();
+  }
+
+  function sortByDueDate(tasks) {
+    return [...tasks].sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
+  }
+
+  function renderClientSections() {
+    const grouped = {};
     state.tasks.forEach(t => {
-      const key = t.source || "Today";
-      if (!sections[key]) sections[key] = [];
-      sections[key].push(t);
+      const key = t.client || "Admin";
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(t);
     });
 
-    const container = document.getElementById("sections");
+    Object.keys(grouped).forEach(c => {
+      grouped[c] = sortByDueDate(grouped[c]);
+    });
+
+    // find which client has the most open items, for the accent border
+    let heaviestClient = null;
+    let heaviestCount = 0;
+    Object.keys(grouped).forEach(c => {
+      const open = grouped[c].filter(t => !t.done).length;
+      if (open > heaviestCount) {
+        heaviestCount = open;
+        heaviestClient = c;
+      }
+    });
+
+    const container = document.getElementById("clientSections");
     container.innerHTML = "";
 
-    Object.keys(sections).forEach(sourceName => {
-      const sectionEl = document.createElement("div");
-      sectionEl.className = "section";
+    const orderedKeys = [
+      ...CLIENT_ORDER.filter(c => grouped[c]),
+      ...Object.keys(grouped).filter(c => !CLIENT_ORDER.includes(c))
+    ];
 
-      const label = document.createElement("div");
-      label.className = "section-label";
-      label.textContent = sourceName;
-      sectionEl.appendChild(label);
+    orderedKeys.forEach(clientName => {
+      const tasks = grouped[clientName];
+      const openCount = tasks.filter(t => !t.done).length;
+
+      const section = document.createElement("div");
+      section.className = "client-section" + (clientName === heaviestClient && heaviestCount > 0 ? " heaviest" : "");
+
+      const headerRow = document.createElement("div");
+      headerRow.className = "client-header";
+      const name = document.createElement("div");
+      name.className = "client-name";
+      name.textContent = clientName;
+      const count = document.createElement("div");
+      count.className = "client-count";
+      count.textContent = `${tasks.length - openCount} / ${tasks.length}`;
+      headerRow.appendChild(name);
+      headerRow.appendChild(count);
+      section.appendChild(headerRow);
 
       const list = document.createElement("ul");
       list.className = "tasks";
 
-      sections[sourceName].forEach(task => {
+      tasks.forEach(task => {
         const li = document.createElement("li");
         li.className = "task";
 
@@ -307,40 +567,141 @@
           }
         });
 
+        const body = document.createElement("div");
+        body.className = "task-body";
+
         const text = document.createElement("div");
         text.className = "task-text" + (task.done ? " done" : "");
         text.textContent = task.text;
         text.addEventListener("click", () => toggleTask(task.id));
 
+        const meta = document.createElement("div");
+        meta.className = "task-meta";
+
+        const src = document.createElement("div");
+        src.className = "task-source";
+        src.textContent = task.source;
+        meta.appendChild(src);
+
+        if (task.dueDate) {
+          const due = document.createElement("div");
+          due.className = "task-due" + (isOverdue(task.dueDate, task.done) ? " overdue" : "");
+          due.textContent = formatDueDate(task.dueDate);
+          meta.appendChild(due);
+        }
+
+        body.appendChild(text);
+        body.appendChild(meta);
+
         li.appendChild(box);
-        li.appendChild(text);
+        li.appendChild(body);
         list.appendChild(li);
       });
 
-      sectionEl.appendChild(list);
+      section.appendChild(list);
 
-      // Add-task row only under the "Today" section
-      if (sourceName === "Today") {
+      if (clientName === "Admin") {
         const addRow = document.createElement("div");
         addRow.className = "add-row";
         const input = document.createElement("input");
         input.type = "text";
-        input.placeholder = "Add a task for today";
+        input.placeholder = "Add an admin task";
+        const dateInput = document.createElement("input");
+        dateInput.type = "date";
         input.addEventListener("keydown", e => {
-          if (e.key === "Enter") addTask(input);
+          if (e.key === "Enter") addTask(input, dateInput);
         });
         const btn = document.createElement("button");
         btn.textContent = "Add";
-        btn.addEventListener("click", () => addTask(input));
+        btn.addEventListener("click", () => addTask(input, dateInput));
         addRow.appendChild(input);
+        addRow.appendChild(dateInput);
         addRow.appendChild(btn);
-        sectionEl.appendChild(addRow);
+        section.appendChild(addRow);
       }
 
-      container.appendChild(sectionEl);
+      container.appendChild(section);
+    });
+  }
+
+  function renderCalendar() {
+    const el = document.getElementById("calendarList");
+    el.innerHTML = "";
+    if (seedCalendar.length === 0) {
+      el.innerHTML = '<div class="empty">Nothing on the calendar today.</div>';
+      return;
+    }
+    seedCalendar.forEach(ev => {
+      const row = document.createElement("div");
+      row.className = "brief-item";
+      row.innerHTML = `
+        <div class="brief-time">${ev.time}</div>
+        <div class="brief-main">${ev.title}<div class="brief-sub">${ev.sub}</div></div>
+      `;
+      el.appendChild(row);
+    });
+  }
+
+  function renderAsana() {
+    const meEl = document.getElementById("asanaMeList");
+    const othersEl = document.getElementById("asanaOthersList");
+    meEl.innerHTML = "";
+    othersEl.innerHTML = "";
+
+    const activeMine = seedAsanaMe.filter(item => !item.completed);
+    const activeOthers = seedAsanaOthers.filter(item => !item.completed);
+
+    if (activeMine.length === 0) {
+      meEl.innerHTML = '<div class="empty">Nothing open right now.</div>';
+    }
+    activeMine.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "brief-item";
+      row.innerHTML = `
+        <div class="brief-main">
+          ${item.text}
+          <div class="brief-sub">${item.client} · ${formatDueDate(item.dueDate)} · "${item.lastComment}"</div>
+        </div>
+        <span class="pill stage">${item.stage}</span>
+      `;
+      meEl.appendChild(row);
     });
 
-    updateProgress();
+    if (activeOthers.length === 0) {
+      othersEl.innerHTML = '<div class="empty">Nothing open right now.</div>';
+    }
+    activeOthers.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "brief-item";
+      row.innerHTML = `
+        <div class="brief-main">
+          ${item.text}
+          <div class="brief-sub">${item.client} · Assigned to ${item.assignee} · "${item.lastComment}"</div>
+        </div>
+        <span class="pill stage">${item.stage}</span>
+      `;
+      othersEl.appendChild(row);
+    });
+  }
+
+  function renderOutages() {
+    const el = document.getElementById("outageList");
+    el.innerHTML = "";
+    if (seedOutages.length === 0) {
+      el.innerHTML = '<div class="empty">No known outages.</div>';
+      return;
+    }
+    seedOutages.forEach(o => {
+      const row = document.createElement("div");
+      row.className = "brief-item";
+      const pillClass = o.status === "open" ? "outage-open" : "outage-watch";
+      const pillText = o.status === "open" ? "Open" : "Watch";
+      row.innerHTML = `
+        <div class="brief-main">${o.text}</div>
+        <span class="pill ${pillClass}">${pillText}</span>
+      `;
+      el.appendChild(row);
+    });
   }
 
   function updateProgress() {
@@ -364,16 +725,20 @@
     render();
   }
 
-  function addTask(inputEl) {
+  function addTask(inputEl, dateInputEl) {
     const value = inputEl.value.trim();
     if (!value) return;
+    const dueDate = dateInputEl && dateInputEl.value ? dateInputEl.value : null;
     state.tasks.push({
       id: "t" + Date.now(),
       text: value,
+      source: "Manual",
+      client: "Admin",
       done: false,
-      source: "Today"
+      dueDate: dueDate
     });
     inputEl.value = "";
+    if (dateInputEl) dateInputEl.value = "";
     saveState(state);
     render();
   }
