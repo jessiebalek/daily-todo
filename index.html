@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily To-Do</title>
+<style>
+  :root {
+    --navy: #0B3D6B;
+    --bg: #ECEEF3;
+    --surface: #FFFFFF;
+    --ink: #1B2334;
+    --muted: #5E6B80;
+    --border: #D4D8E4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header {
+    margin-bottom: 28px;
+  }
+
+  .date {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 30px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+  }
+
+  .status-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .status-line span.count {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .progress-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--navy);
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  .section {
+    margin-bottom: 28px;
+  }
+
+  .section-label {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+
+  ul.tasks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  li.task {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  li.task:last-child {
+    border-bottom: none;
+  }
+
+  .checkbox {
+    flex-shrink: 0;
+    width: 19px;
+    height: 19px;
+    margin-top: 1px;
+    border: 1.5px solid var(--muted);
+    border-radius: 4px;
+    background: var(--surface);
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .checkbox:focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: 2px;
+  }
+
+  .checkbox.checked {
+    background: var(--navy);
+    border-color: var(--navy);
+  }
+
+  .checkbox.checked::after {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 1px;
+    width: 5px;
+    height: 9px;
+    border-right: 2px solid white;
+    border-bottom: 2px solid white;
+    transform: rotate(45deg);
+  }
+
+  .task-text {
+    flex: 1;
+    font-size: 16px;
+    line-height: 1.4;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .task-text.done {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--border);
+  }
+
+  .task-meta {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .empty {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 16px 0;
+  }
+
+  .add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .add-row input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 15px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  .add-row input:focus {
+    outline: none;
+    border-color: var(--navy);
+  }
+
+  .add-row button {
+    border: none;
+    background: var(--navy);
+    color: white;
+    border-radius: 6px;
+    padding: 0 16px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .sync-note {
+    margin-top: 36px;
+    font-size: 12px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .progress-fill { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1 class="date" id="dateHeader">Loading…</h1>
+    <div class="status-line">
+      <span id="statusText">—</span>
+      <span class="count" id="countText"></span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </header>
+
+  <div id="sections"></div>
+
+  <div class="sync-note" id="syncNote">Checked items are saved locally on this device.</div>
+</div>
+
+<script>
+  // ---- Data model ----
+  // Each task: { id, text, done, source }
+  // Replace this seed list with whatever your nightly routine generates.
+  const STORAGE_KEY = "dailyTodoState";
+
+  const seedTasks = [
+    { id: "t1", text: "Review overnight Asana comments", done: false, source: "Asana" },
+    { id: "t2", text: "Reply to outstanding Slack threads", done: false, source: "Slack" },
+    { id: "t3", text: "Draft daily briefing follow-up", done: false, source: "Today" }
+  ];
+
+  function loadState() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { date: todayLabel(), tasks: seedTasks };
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.date !== todayLabel()) {
+        // A new day started client-side; in the real version, the nightly
+        // job replaces this file/data before the page loads, so this is
+        // just a same-day fallback.
+        return { date: todayLabel(), tasks: seedTasks };
+      }
+      return parsed;
+    } catch (e) {
+      return { date: todayLabel(), tasks: seedTasks };
+    }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function todayLabel() {
+    return new Date().toDateString();
+  }
+
+  let state = loadState();
+
+  // ---- Rendering ----
+  function render() {
+    document.getElementById("dateHeader").textContent =
+      new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+    const sections = {};
+    state.tasks.forEach(t => {
+      const key = t.source || "Today";
+      if (!sections[key]) sections[key] = [];
+      sections[key].push(t);
+    });
+
+    const container = document.getElementById("sections");
+    container.innerHTML = "";
+
+    Object.keys(sections).forEach(sourceName => {
+      const sectionEl = document.createElement("div");
+      sectionEl.className = "section";
+
+      const label = document.createElement("div");
+      label.className = "section-label";
+      label.textContent = sourceName;
+      sectionEl.appendChild(label);
+
+      const list = document.createElement("ul");
+      list.className = "tasks";
+
+      sections[sourceName].forEach(task => {
+        const li = document.createElement("li");
+        li.className = "task";
+
+        const box = document.createElement("div");
+        box.className = "checkbox" + (task.done ? " checked" : "");
+        box.setAttribute("role", "checkbox");
+        box.setAttribute("aria-checked", task.done ? "true" : "false");
+        box.setAttribute("tabindex", "0");
+        box.addEventListener("click", () => toggleTask(task.id));
+        box.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleTask(task.id);
+          }
+        });
+
+        const text = document.createElement("div");
+        text.className = "task-text" + (task.done ? " done" : "");
+        text.textContent = task.text;
+        text.addEventListener("click", () => toggleTask(task.id));
+
+        li.appendChild(box);
+        li.appendChild(text);
+        list.appendChild(li);
+      });
+
+      sectionEl.appendChild(list);
+
+      // Add-task row only under the "Today" section
+      if (sourceName === "Today") {
+        const addRow = document.createElement("div");
+        addRow.className = "add-row";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "Add a task for today";
+        input.addEventListener("keydown", e => {
+          if (e.key === "Enter") addTask(input);
+        });
+        const btn = document.createElement("button");
+        btn.textContent = "Add";
+        btn.addEventListener("click", () => addTask(input));
+        addRow.appendChild(input);
+        addRow.appendChild(btn);
+        sectionEl.appendChild(addRow);
+      }
+
+      container.appendChild(sectionEl);
+    });
+
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const total = state.tasks.length;
+    const done = state.tasks.filter(t => t.done).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+
+    document.getElementById("progressFill").style.width = pct + "%";
+    document.getElementById("countText").textContent = `${done} / ${total}`;
+    document.getElementById("statusText").textContent =
+      total === 0 ? "Nothing on the list" :
+      done === total ? "All done" :
+      `${pct}% complete`;
+  }
+
+  function toggleTask(id) {
+    const task = state.tasks.find(t => t.id === id);
+    if (!task) return;
+    task.done = !task.done;
+    saveState(state);
+    render();
+  }
+
+  function addTask(inputEl) {
+    const value = inputEl.value.trim();
+    if (!value) return;
+    state.tasks.push({
+      id: "t" + Date.now(),
+      text: value,
+      done: false,
+      source: "Today"
+    });
+    inputEl.value = "";
+    saveState(state);
+    render();
+  }
+
+  render();
+</script>
+</body>
+</html>
