@@ -345,9 +345,88 @@
     padding: 8px 0;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .progress-fill { transition: none; }
+  /* ---- Token setup overlay ---- */
+  .token-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(11,61,107,0.18);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
   }
+
+  .token-overlay.visible {
+    display: flex;
+  }
+
+  .token-card {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 32px 28px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(11,61,107,0.14);
+  }
+
+  .token-card h2 {
+    font-family: Georgia, serif;
+    font-size: 18px;
+    color: var(--navy);
+    margin: 0 0 8px;
+  }
+
+  .token-card p {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0 0 16px;
+    line-height: 1.5;
+  }
+
+  .token-card input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: monospace;
+    color: var(--ink);
+    margin-bottom: 12px;
+  }
+
+  .token-card input:focus {
+    outline: none;
+    border-color: var(--navy);
+  }
+
+  .token-card button {
+    width: 100%;
+    background: var(--navy);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 11px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .token-card .token-error {
+    font-size: 13px;
+    color: var(--accent);
+    margin-top: 8px;
+    min-height: 18px;
+  }
+
+  .sync-status {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+    text-align: right;
+    min-height: 16px;
+  }
+
+  .sync-status.error { color: var(--accent); }
+  .sync-status.ok { color: #2A7A4B; }
 
   @media (max-width: 480px) {
     .brief-time { width: 50px; }
@@ -358,6 +437,16 @@
 </style>
 </head>
 <body>
+<div class="token-overlay" id="tokenOverlay">
+  <div class="token-card">
+    <h2>Connect to GitHub</h2>
+    <p>Paste your GitHub personal access token below. It's stored only in this browser and used to save your checkbox state back to your repo.</p>
+    <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+    <button id="tokenSaveBtn">Save & Continue</button>
+    <div class="token-error" id="tokenError"></div>
+  </div>
+</div>
+
 <div class="page">
   <header>
     <h1 class="date" id="dateHeader">Loading…</h1>
@@ -366,6 +455,7 @@
       <span class="count" id="countText"></span>
     </div>
     <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="sync-status" id="syncStatus"></div>
   </header>
 
   <div id="clientSections"></div>
@@ -394,7 +484,444 @@
 </div>
 
 <script>
-  const STORAGE_KEY = "dailyTodoState_v2";
+  // ---- Config ----
+  const GITHUB_OWNER = "jessiebalek";
+  const GITHUB_REPO  = "daily-todo";
+  const GITHUB_FILE  = "data.json";
+  const TOKEN_KEY    = "ghToken_dailyTodo";
+  const LOCAL_KEY    = "dailyTodo_localState_v3";
+
+  // ---- Seed tasks (replaced nightly by Claude Code routine) ----
+  const seedTasks = [
+    { id: "a1", text: "Finalize Q3 messaging deck redline", source: "Asana", client: "AFA", done: false, dueDate: "2026-06-30" },
+    { id: "a2", text: "Send revised press pitch for review", source: "Email", client: "AFA", done: false, dueDate: "2026-07-02" },
+    { id: "m1", text: "Confirm spokesperson availability", source: "Slack", client: "MPPL", done: false, dueDate: "2026-06-29" },
+    { id: "r1", text: "Review competitive analysis draft", source: "Granola", client: "RWA", done: false, dueDate: null },
+    { id: "s1", text: "Approve social content calendar", source: "Asana", client: "SCS", done: false, dueDate: "2026-07-01" },
+    { id: "aa1", text: "Follow up on outstanding byline edits", source: "Email", client: "AAAIM", done: false, dueDate: null },
+    { id: "ad1", text: "Submit weekly time tracking", source: "Asana", client: "Admin", done: false, dueDate: "2026-06-30" },
+    { id: "ad2", text: "Clear inbox backlog", source: "Email", client: "Admin", done: false, dueDate: null }
+  ];
+
+  const seedCalendar = [
+    { time: "9:00 AM", title: "AFA weekly sync", sub: "Zoom · 30 min" },
+    { time: "11:30 AM", title: "MPPL spokesperson prep call", sub: "Zoom · 45 min" },
+    { time: "2:00 PM", title: "Internal team standup", sub: "Slack huddle · 15 min" }
+  ];
+
+  const seedAsanaMe = [
+    { text: "Draft RWA positioning summary", client: "RWA", dueDate: "2026-07-01", stage: "In Progress", lastComment: "Pulled in competitor quotes, finishing exec summary tonight.", completed: false },
+    { text: "Review SCS social copy batch", client: "SCS", dueDate: "2026-07-02", stage: "In Review", lastComment: "Sent back two posts for tone adjustments.", completed: false },
+    { text: "Update AFA press list", client: "AFA", dueDate: "2026-06-27", stage: "Done", lastComment: "Finalized and shared with the team.", completed: true }
+  ];
+
+  const seedAsanaOthers = [
+    { text: "AAAIM byline — awaiting client edits", client: "AAAIM", dueDate: "2026-07-03", stage: "Blocked", lastComment: "Alex: still waiting on client sign-off, following up today.", completed: false, assignee: "Alex" },
+    { text: "AFA deck — design pass", client: "AFA", dueDate: "2026-07-02", stage: "In Progress", lastComment: "Priya: first pass done, second round of edits tomorrow.", completed: false, assignee: "Priya" },
+    { text: "MPPL outreach tracker cleanup", client: "MPPL", dueDate: "2026-06-26", stage: "Done", lastComment: "Jordan: archived stale rows, tracker is current.", completed: true, assignee: "Jordan" }
+  ];
+
+  const seedOutages = [
+    { text: "Slack — intermittent notification delays", status: "open" },
+    { text: "Granola — transcript sync running ~10 min behind", status: "watch" }
+  ];
+
+  // ---- Token management ----
+  let ghToken = localStorage.getItem(TOKEN_KEY) || null;
+
+  function showTokenOverlay() {
+    document.getElementById("tokenOverlay").classList.add("visible");
+  }
+
+  function hideTokenOverlay() {
+    document.getElementById("tokenOverlay").classList.remove("visible");
+  }
+
+  document.getElementById("tokenSaveBtn").addEventListener("click", async () => {
+    const val = document.getElementById("tokenInput").value.trim();
+    if (!val) return;
+    document.getElementById("tokenError").textContent = "Checking…";
+    const ok = await verifyToken(val);
+    if (ok) {
+      ghToken = val;
+      localStorage.setItem(TOKEN_KEY, val);
+      hideTokenOverlay();
+      await loadFromGitHub();
+    } else {
+      document.getElementById("tokenError").textContent = "Token didn't work — check it has repo scope and try again.";
+    }
+  });
+
+  async function verifyToken(token) {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`, {
+        headers: { Authorization: `token ${token}` }
+      });
+      return res.ok;
+    } catch { return false; }
+  }
+
+  // ---- GitHub data.json read/write ----
+  let remoteFileSha = null;
+
+  async function loadFromGitHub() {
+    setSyncStatus("Syncing…", "");
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
+        { headers: { Authorization: `token ${ghToken}` } }
+      );
+      if (!res.ok) throw new Error("fetch failed");
+      const json = await res.json();
+      remoteFileSha = json.sha;
+      const decoded = JSON.parse(atob(json.content.replace(/\n/g, "")));
+
+      // Apply remote checked state to today's seed tasks
+      const today = todayLabel();
+      if (decoded.date === today && Array.isArray(decoded.checkedIds)) {
+        state.tasks.forEach(t => {
+          t.done = decoded.checkedIds.includes(t.id);
+        });
+        // Restore any manually added tasks saved remotely
+        if (Array.isArray(decoded.manualTasks)) {
+          const existingIds = new Set(state.tasks.map(t => t.id));
+          decoded.manualTasks.forEach(mt => {
+            if (!existingIds.has(mt.id)) state.tasks.push(mt);
+          });
+        }
+      }
+      setSyncStatus("Synced just now", "ok");
+    } catch (e) {
+      setSyncStatus("Could not reach GitHub — working offline", "error");
+    }
+    render();
+  }
+
+  async function saveToGitHub() {
+    if (!ghToken) return;
+    const checkedIds = state.tasks.filter(t => t.done).map(t => t.id);
+    const manualTasks = state.tasks.filter(t => t.source === "Manual");
+    const payload = {
+      date: todayLabel(),
+      checkedIds,
+      manualTasks
+    };
+    const content = btoa(JSON.stringify(payload, null, 2));
+    setSyncStatus("Saving…", "");
+    try {
+      const body = {
+        message: `Update todo state ${new Date().toLocaleTimeString()}`,
+        content,
+        ...(remoteFileSha ? { sha: remoteFileSha } : {})
+      };
+      const res = await fetch(
+        `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `token ${ghToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
+        }
+      );
+      if (!res.ok) throw new Error("save failed");
+      const json = await res.json();
+      remoteFileSha = json.content.sha;
+      setSyncStatus("Saved to GitHub", "ok");
+    } catch (e) {
+      setSyncStatus("Save failed — will retry next change", "error");
+    }
+  }
+
+  function setSyncStatus(msg, cls) {
+    const el = document.getElementById("syncStatus");
+    el.textContent = msg;
+    el.className = "sync-status" + (cls ? " " + cls : "");
+  }
+
+  // ---- Local state (fallback while offline / before GitHub loads) ----
+  function todayLabel() {
+    return new Date().toDateString();
+  }
+
+  function formatDueDate(isoDate) {
+    const d = new Date(isoDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((d - today) / 86400000);
+    if (diffDays === 0) return "Due today";
+    if (diffDays === 1) return "Due tomorrow";
+    if (diffDays === -1) return "Due yesterday";
+    return `Due ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  }
+
+  function isOverdue(isoDate, done) {
+    if (done) return false;
+    const d = new Date(isoDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d < today;
+  }
+
+  // State lives in memory (source of truth is GitHub; localStorage is just a fast-load cache)
+  let state = { date: todayLabel(), tasks: JSON.parse(JSON.stringify(seedTasks)) };
+
+  // Restore from localStorage so the page feels instant on load
+  const cached = localStorage.getItem(LOCAL_KEY);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (parsed.date === todayLabel()) state = parsed;
+    } catch {}
+  }
+
+  function persistLocal() {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+  }
+
+  const CLIENT_ORDER = ["AFA", "MPPL", "RWA", "SCS", "AAAIM", "Admin"];
+
+  function render() {
+    document.getElementById("dateHeader").textContent =
+      new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    renderClientSections();
+    renderCalendar();
+    renderAsana();
+    renderOutages();
+    updateProgress();
+  }
+
+  function sortByDueDate(tasks) {
+    return [...tasks].sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
+  }
+
+  function renderClientSections() {
+    const grouped = {};
+    state.tasks.forEach(t => {
+      const key = t.client || "Admin";
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(t);
+    });
+
+    Object.keys(grouped).forEach(c => {
+      grouped[c] = sortByDueDate(grouped[c]);
+    });
+
+    let heaviestClient = null, heaviestCount = 0;
+    Object.keys(grouped).forEach(c => {
+      const open = grouped[c].filter(t => !t.done).length;
+      if (open > heaviestCount) { heaviestCount = open; heaviestClient = c; }
+    });
+
+    const container = document.getElementById("clientSections");
+    container.innerHTML = "";
+
+    const orderedKeys = [
+      ...CLIENT_ORDER.filter(c => grouped[c]),
+      ...Object.keys(grouped).filter(c => !CLIENT_ORDER.includes(c))
+    ];
+
+    orderedKeys.forEach(clientName => {
+      const tasks = grouped[clientName];
+      const openCount = tasks.filter(t => !t.done).length;
+
+      const section = document.createElement("div");
+      section.className = "client-section" + (clientName === heaviestClient && heaviestCount > 0 ? " heaviest" : "");
+
+      const headerRow = document.createElement("div");
+      headerRow.className = "client-header";
+      const name = document.createElement("div");
+      name.className = "client-name";
+      name.textContent = clientName;
+      const count = document.createElement("div");
+      count.className = "client-count";
+      count.textContent = `${tasks.length - openCount} / ${tasks.length}`;
+      headerRow.appendChild(name);
+      headerRow.appendChild(count);
+      section.appendChild(headerRow);
+
+      const list = document.createElement("ul");
+      list.className = "tasks";
+
+      tasks.forEach(task => {
+        const li = document.createElement("li");
+        li.className = "task";
+
+        const box = document.createElement("div");
+        box.className = "checkbox" + (task.done ? " checked" : "");
+        box.setAttribute("role", "checkbox");
+        box.setAttribute("aria-checked", task.done ? "true" : "false");
+        box.setAttribute("tabindex", "0");
+        box.addEventListener("click", () => toggleTask(task.id));
+        box.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleTask(task.id); }
+        });
+
+        const body = document.createElement("div");
+        body.className = "task-body";
+
+        const text = document.createElement("div");
+        text.className = "task-text" + (task.done ? " done" : "");
+        text.textContent = task.text;
+        text.addEventListener("click", () => toggleTask(task.id));
+
+        const meta = document.createElement("div");
+        meta.className = "task-meta";
+
+        const src = document.createElement("div");
+        src.className = "task-source";
+        src.textContent = task.source;
+        meta.appendChild(src);
+
+        if (task.dueDate) {
+          const due = document.createElement("div");
+          due.className = "task-due" + (isOverdue(task.dueDate, task.done) ? " overdue" : "");
+          due.textContent = formatDueDate(task.dueDate);
+          meta.appendChild(due);
+        }
+
+        body.appendChild(text);
+        body.appendChild(meta);
+        li.appendChild(box);
+        li.appendChild(body);
+        list.appendChild(li);
+      });
+
+      section.appendChild(list);
+
+      if (clientName === "Admin") {
+        const addRow = document.createElement("div");
+        addRow.className = "add-row";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "Add an admin task";
+        const dateInput = document.createElement("input");
+        dateInput.type = "date";
+        input.addEventListener("keydown", e => { if (e.key === "Enter") addTask(input, dateInput); });
+        const btn = document.createElement("button");
+        btn.textContent = "Add";
+        btn.addEventListener("click", () => addTask(input, dateInput));
+        addRow.appendChild(input);
+        addRow.appendChild(dateInput);
+        addRow.appendChild(btn);
+        section.appendChild(addRow);
+      }
+
+      container.appendChild(section);
+    });
+  }
+
+  function renderCalendar() {
+    const el = document.getElementById("calendarList");
+    el.innerHTML = "";
+    if (seedCalendar.length === 0) {
+      el.innerHTML = '<div class="empty">Nothing on the calendar today.</div>';
+      return;
+    }
+    seedCalendar.forEach(ev => {
+      const row = document.createElement("div");
+      row.className = "brief-item";
+      row.innerHTML = `<div class="brief-time">${ev.time}</div><div class="brief-main">${ev.title}<div class="brief-sub">${ev.sub}</div></div>`;
+      el.appendChild(row);
+    });
+  }
+
+  function renderAsana() {
+    const meEl = document.getElementById("asanaMeList");
+    const othersEl = document.getElementById("asanaOthersList");
+    meEl.innerHTML = "";
+    othersEl.innerHTML = "";
+
+    const activeMine = seedAsanaMe.filter(item => !item.completed);
+    const activeOthers = seedAsanaOthers.filter(item => !item.completed);
+
+    if (activeMine.length === 0) meEl.innerHTML = '<div class="empty">Nothing open right now.</div>';
+    activeMine.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "brief-item";
+      row.innerHTML = `
+        <div class="brief-main">${item.text}
+          <div class="brief-sub">${item.client} · ${formatDueDate(item.dueDate)} · "${item.lastComment}"</div>
+        </div>
+        <span class="pill stage">${item.stage}</span>`;
+      meEl.appendChild(row);
+    });
+
+    if (activeOthers.length === 0) othersEl.innerHTML = '<div class="empty">Nothing open right now.</div>';
+    activeOthers.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "brief-item";
+      row.innerHTML = `
+        <div class="brief-main">${item.text}
+          <div class="brief-sub">${item.client} · Assigned to ${item.assignee} · "${item.lastComment}"</div>
+        </div>
+        <span class="pill stage">${item.stage}</span>`;
+      othersEl.appendChild(row);
+    });
+  }
+
+  function renderOutages() {
+    const el = document.getElementById("outageList");
+    el.innerHTML = "";
+    if (seedOutages.length === 0) {
+      el.innerHTML = '<div class="empty">No known outages.</div>';
+      return;
+    }
+    seedOutages.forEach(o => {
+      const row = document.createElement("div");
+      row.className = "brief-item";
+      const pillClass = o.status === "open" ? "outage-open" : "outage-watch";
+      row.innerHTML = `<div class="brief-main">${o.text}</div><span class="pill ${pillClass}">${o.status === "open" ? "Open" : "Watch"}</span>`;
+      el.appendChild(row);
+    });
+  }
+
+  function updateProgress() {
+    const total = state.tasks.length;
+    const done = state.tasks.filter(t => t.done).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    document.getElementById("progressFill").style.width = pct + "%";
+    document.getElementById("countText").textContent = `${done} / ${total}`;
+    document.getElementById("statusText").textContent =
+      total === 0 ? "Nothing on the list" :
+      done === total ? "All done" : `${pct}% complete`;
+  }
+
+  function toggleTask(id) {
+    const task = state.tasks.find(t => t.id === id);
+    if (!task) return;
+    task.done = !task.done;
+    persistLocal();
+    render();
+    saveToGitHub();
+  }
+
+  function addTask(inputEl, dateInputEl) {
+    const value = inputEl.value.trim();
+    if (!value) return;
+    const dueDate = dateInputEl && dateInputEl.value ? dateInputEl.value : null;
+    state.tasks.push({ id: "t" + Date.now(), text: value, source: "Manual", client: "Admin", done: false, dueDate });
+    inputEl.value = "";
+    if (dateInputEl) dateInputEl.value = "";
+    persistLocal();
+    render();
+    saveToGitHub();
+  }
+
+  // ---- Boot ----
+  render(); // fast first paint from local cache
+  if (!ghToken) {
+    showTokenOverlay();
+  } else {
+    loadFromGitHub(); // pull remote state and re-render
+  }
+</script>
 
   // ---- Seed data — replace with real pulls from the nightly Claude Code routine ----
   const seedTasks = [
@@ -729,21 +1256,21 @@
     const value = inputEl.value.trim();
     if (!value) return;
     const dueDate = dateInputEl && dateInputEl.value ? dateInputEl.value : null;
-    state.tasks.push({
-      id: "t" + Date.now(),
-      text: value,
-      source: "Manual",
-      client: "Admin",
-      done: false,
-      dueDate: dueDate
-    });
+    state.tasks.push({ id: "t" + Date.now(), text: value, source: "Manual", client: "Admin", done: false, dueDate });
     inputEl.value = "";
     if (dateInputEl) dateInputEl.value = "";
-    saveState(state);
+    persistLocal();
     render();
+    saveToGitHub();
   }
 
-  render();
+  // ---- Boot ----
+  render(); // fast first paint from local cache
+  if (!ghToken) {
+    showTokenOverlay();
+  } else {
+    loadFromGitHub();
+  }
 </script>
 </body>
 </html>
